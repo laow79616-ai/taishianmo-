@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>预约下单</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body{background:#f8f5f0;-webkit-tap-highlight-color:transparent}
+    input,select,textarea{font-size:16px!important}
+    .pac-container{z-index:10000!important;font-family:inherit}
+  </style>
+</head>
+<body class="min-h-screen" style="padding-bottom:calc(24px + env(safe-area-inset-bottom))">
+  <header class="bg-rose-800 text-white sticky top-0 z-50 shadow" style="padding-top:env(safe-area-inset-top)">
+    <div class="max-w-lg mx-auto px-4 py-3.5 flex items-center gap-3">
+      <a href="javascript:history.back()" class="text-xl px-1">←</a>
+      <h1 class="text-base font-bold">填写预约信息</h1>
+    </div>
+  </header>
+  <main class="max-w-lg mx-auto px-3 py-4">
+    <div id="service-info" class="bg-white rounded-2xl p-4 shadow-sm mb-3 text-sm text-gray-400">加载中...</div>
+    <div class="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 mb-3 text-sm text-rose-900" id="pay-note">
+      见面收取费用，支持 USD / 支付宝 / 微信
+    </div>
+    <form id="book-form" class="space-y-3">
+      <div id="item-box" class="bg-white rounded-2xl p-4 shadow-sm hidden">
+        <label class="block text-sm font-semibold mb-2">选择服务项目 *</label>
+        <div id="item-list" class="space-y-2"></div>
+      </div>
+      <div class="bg-white rounded-2xl p-4 shadow-sm">
+        <label class="block text-sm font-semibold mb-2">服务方式</label>
+        <div class="flex gap-2">
+          <button type="button" id="btn-store" onclick="setType('in_store')" class="flex-1 py-3 rounded-xl text-sm font-medium border-2 border-rose-700 bg-rose-50 text-rose-800">到店</button>
+          <button type="button" id="btn-out" onclick="setType('outcall')" class="flex-1 py-3 rounded-xl text-sm font-medium border-2 border-gray-200 text-gray-600">上门</button>
+        </div>
+      </div>
+      <div id="store-box" class="bg-white rounded-2xl p-4 shadow-sm">
+        <p class="text-sm font-semibold mb-1">📍 门店地址</p>
+        <p id="store-address" class="text-sm text-gray-600">加载中...</p>
+        <a id="store-map" href="#" target="_blank" class="inline-block mt-2 text-sm text-rose-700 font-medium">打开地图导航 →</a>
+      </div>
+      <div id="out-box" class="bg-white rounded-2xl p-4 shadow-sm hidden">
+        <label class="block text-sm font-semibold mb-2">📍 上门地址（谷歌地图搜索）*</label>
+        <input type="text" id="address_name" placeholder="输入地址关键词，自动搜索定位..." class="w-full border rounded-xl px-3.5 py-3" autocomplete="off">
+        <input type="hidden" id="lat"><input type="hidden" id="lng">
+        <div class="flex gap-2 mt-2">
+          <button type="button" onclick="useMyLocation()" class="flex-1 text-sm border border-rose-600 text-rose-700 py-2.5 rounded-xl font-medium">📍 使用我的定位</button>
+        </div>
+        <input type="text" id="address_detail" placeholder="门牌/楼层/单元（可选）" class="w-full border rounded-xl px-3.5 py-3 mt-2">
+        <p class="text-xs text-gray-400 mt-2">打车费按门店到您地址的距离估算</p>
+        <p id="taxi-info" class="text-sm text-rose-700 mt-1 hidden"></p>
+      </div>
+      <div class="bg-white rounded-2xl p-4 shadow-sm">
+        <label class="block text-sm font-semibold mb-2">📱 预留电话 *</label>
+        <input type="tel" id="user_phone" required inputmode="tel" placeholder="手机号码" class="w-full border rounded-xl px-3.5 py-3">
+      </div>
+      <div class="bg-white rounded-2xl p-4 shadow-sm">
+        <label class="block text-sm font-semibold mb-2">📅 预约日期 *</label>
+        <input type="date" id="appointment_date" required class="w-full border rounded-xl px-3.5 py-3">
+        <label class="block text-sm font-semibold mb-2 mt-3">🕐 预约时间 *</label>
+        <select id="appointment_time" required class="w-full border rounded-xl px-3.5 py-3 bg-white">
+          <option value="">请选择</option>
+          <option>10:00</option><option>11:00</option><option>12:00</option><option>13:00</option>
+          <option>14:00</option><option>15:00</option><option>16:00</option><option>17:00</option>
+          <option>18:00</option><option>19:00</option>
+        </select>
+      </div>
+      <div class="bg-white rounded-2xl p-4 shadow-sm">
+        <label class="block text-sm font-semibold mb-2">备注</label>
+        <textarea id="remark" rows="2" placeholder="特殊要求等" class="w-full border rounded-xl px-3.5 py-3"></textarea>
+      </div>
+      <div class="bg-white rounded-2xl p-4 shadow-sm text-sm">
+        <div class="flex justify-between"><span>服务费</span><span id="fee-service" class="font-bold text-rose-700">¥0</span></div>
+        <div class="flex justify-between mt-1" id="fee-taxi-row"><span>预估打车费</span><span id="fee-taxi" class="font-bold">¥0</span></div>
+      </div>
+      <button type="submit" id="submit-btn" class="w-full bg-rose-700 text-white py-4 rounded-2xl font-bold">确认预约并提交</button>
+    </form>
+    <div id="msg" class="mt-4 text-center text-sm hidden"></div>
+  </main>
+  <script>
+    const params=new URLSearchParams(location.search);
+    const serviceId=params.get('id');
+    let serviceType=params.get('type')||'in_store';
+    let service=null, store=null, mapsKey='', selectedItemId=null;
+
+    document.getElementById('appointment_date').min=new Date().toISOString().split('T')[0];
+
+    function setType(t){
+      serviceType=t;
+      document.getElementById('btn-store').className=t==='in_store'
+        ?'flex-1 py-3 rounded-xl text-sm font-medium border-2 border-rose-700 bg-rose-50 text-rose-800'
+        :'flex-1 py-3 rounded-xl text-sm font-medium border-2 border-gray-200 text-gray-600';
+      document.getElementById('btn-out').className=t==='outcall'
+        ?'flex-1 py-3 rounded-xl text-sm font-medium border-2 border-rose-700 bg-rose-50 text-rose-800'
+        :'flex-1 py-3 rounded-xl text-sm font-medium border-2 border-gray-200 text-gray-600';
+      document.getElementById('store-box').classList.toggle('hidden', t!=='in_store');
+      document.getElementById('out-box').classList.toggle('hidden', t!=='outcall');
+      document.getElementById('fee-taxi-row').classList.toggle('hidden', t!=='outcall');
+      updatePrice();
+      if(t==='outcall') setTimeout(initAutocomplete, 200);
+    }
+
+    function updatePrice(){
+      if(!service) return;
+      let p=serviceType==='outcall'?(service.price_outcall||0):(service.price_in_store||0);
+      if(service.items&&service.items.length){
+        const it=service.items.find(x=>x.id==selectedItemId)||service.items[0];
+        if(it) p=serviceType==='outcall'?it.price_outcall:it.price_in_store;
+        // refresh radio labels
+        document.querySelectorAll('#item-list label').forEach((lab,i)=>{
+          const item=service.items[i];
+          if(!item) return;
+          const priceEl=lab.querySelector('.text-rose-700');
+          if(priceEl) priceEl.textContent='¥'+(serviceType==='outcall'?item.price_outcall:item.price_in_store);
+        });
+      }
+      document.getElementById('fee-service').textContent='¥'+p;
+    }
+
+    async function updateTaxiFee(){
+      const lat=parseFloat(document.getElementById('lat').value);
+      const lng=parseFloat(document.getElementById('lng').value);
+      const info=document.getElementById('taxi-info');
+      const feeEl=document.getElementById('fee-taxi');
+      if(!lat||!lng){info.classList.add('hidden');feeEl.textContent='¥0';return}
+      try{
+        const r=await (await fetch(`/api/taxi-fee?lat=${lat}&lng=${lng}`)).json();
+        info.textContent=`约 ${r.distance_km} 公里，预估打车 ¥${r.taxi_fee}`;
+        info.classList.remove('hidden');
+        feeEl.textContent='¥'+r.taxi_fee;
+      }catch(e){info.classList.add('hidden')}
+    }
+
+    function useMyLocation(){
+      if(!navigator.geolocation){alert('浏览器不支持定位');return}
+      navigator.geolocation.getCurrentPosition(async pos=>{
+        const lat=pos.coords.latitude, lng=pos.coords.longitude;
+        document.getElementById('lat').value=lat;
+        document.getElementById('lng').value=lng;
+        // reverse geocode via nominatim (no key needed)
+        try{
+          const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=zh`);
+          const d=await r.json();
+          document.getElementById('address_name').value=d.display_name||`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        }catch(e){
+          document.getElementById('address_name').value=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        }
+        updateTaxiFee();
+      }, ()=>alert('定位失败，请手动搜索地址'), {enableHighAccuracy:true,timeout:10000});
+    }
+
+    let autocompleteInited=false;
+    function initAutocomplete(){
+      if(autocompleteInited) return;
+      const input=document.getElementById('address_name');
+      if(mapsKey && window.google && google.maps && google.maps.places){
+        const ac=new google.maps.places.Autocomplete(input,{
+          fields:['formatted_address','geometry','name'],
+          componentRestrictions:{country:['my','cn','sg','th']}
+        });
+        ac.addListener('place_changed',()=>{
+          const place=ac.getPlace();
+          if(place.geometry){
+            document.getElementById('lat').value=place.geometry.location.lat();
+            document.getElementById('lng').value=place.geometry.location.lng();
+            if(place.formatted_address) input.value=place.formatted_address;
+            updateTaxiFee();
+          }
+        });
+        autocompleteInited=true;
+      } else {
+        // fallback: free Nominatim search on blur/enter
+        let timer;
+        input.addEventListener('input',()=>{
+          clearTimeout(timer);
+          timer=setTimeout(()=>searchNominatim(input.value),600);
+        });
+      }
+    }
+
+    async function searchNominatim(q){
+      if(!q||q.length<3) return;
+      try{
+        const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&accept-language=zh`);
+        const arr=await r.json();
+        if(arr[0]){
+          document.getElementById('lat').value=arr[0].lat;
+          document.getElementById('lng').value=arr[0].lon;
+          updateTaxiFee();
+        }
+      }catch(e){}
+    }
+
+    function loadGoogleMaps(key){
+      if(!key){initAutocomplete();return}
+      if(window.google&&google.maps){initAutocomplete();return}
+      const s=document.createElement('script');
+      s.src=`https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=zh-CN`;
+      s.async=true;
+      s.onload=()=>initAutocomplete();
+      s.onerror=()=>initAutocomplete();
+      document.head.appendChild(s);
+    }
+
+    async function load(){
+      if(!serviceId){location.href='/';return}
+      try{
+        const st=await (await fetch('/api/store')).json();
+        if(st.booking_open===false){
+          document.getElementById('book-form').innerHTML='<div class="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-6 text-center"><p class="font-bold">⏸ 服务中，暂不可预约</p><p class="text-sm mt-2">请稍后再试</p><a href="/" class="inline-block mt-4 text-rose-700 font-medium">返回首页</a></div>';
+          return;
+        }
+        mapsKey=st.google_maps_key||'';
+      }catch(e){}
+      const s=await (await fetch('/api/services/'+serviceId)).json();
+      service=s; store=s.store||{};
+      if(s.accepting===0||s.accepting==='0'){
+        document.getElementById('book-form').innerHTML='<div class="bg-red-50 border border-red-200 text-red-800 rounded-2xl p-6 text-center"><p class="font-bold">⏸ 该服务商服务中</p><p class="text-sm mt-2">暂不可预约，请稍后再试或选择其他服务商</p><a href="/" class="inline-block mt-4 text-rose-700 font-medium">返回首页</a></div>';
+        return;
+      }
+      document.getElementById('pay-note').textContent=s.payment_note||'见面收取费用，支持 USD / 支付宝 / 微信';
+      if(s.items&&s.items.length){
+        document.getElementById('item-box').classList.remove('hidden');
+        document.getElementById('item-list').innerHTML=s.items.map((it,i)=>`
+          <label class="flex items-center gap-3 border rounded-xl px-3 py-2.5 cursor-pointer">
+            <input type="radio" name="svc_item" value="${it.id}" ${i===0?'checked':''} onchange="selectedItemId=${it.id};updatePrice()">
+            <div class="flex-1"><p class="font-medium text-sm">${it.name}</p><p class="text-xs text-gray-400">${it.duration}分钟</p></div>
+            <div class="text-right text-sm"><span class="text-rose-700 font-bold">¥${serviceType==='outcall'?it.price_outcall:it.price_in_store}</span></div>
+          </label>`).join('');
+        selectedItemId=s.items[0].id;
+      }
+      document.getElementById('service-info').innerHTML=`
+        <div class="flex gap-3 items-center">
+          <img src="${s.image_url||'https://picsum.photos/100/100'}" class="w-14 h-14 rounded-xl object-cover">
+          <div><h3 class="font-bold text-sm text-gray-800">${s.name}</h3>
+          <p class="text-xs text-gray-500 mt-0.5">${s.duration}分钟</p></div>
+        </div>`;
+      document.getElementById('store-address').textContent=store.address||'门店';
+      if(store.map_url) document.getElementById('store-map').href=store.map_url;
+      setType(serviceType);
+      loadGoogleMaps(mapsKey);
+    }
+
+    document.getElementById('book-form').addEventListener('submit',async e=>{
+      e.preventDefault();
+      const btn=document.getElementById('submit-btn'), msg=document.getElementById('msg');
+      btn.disabled=true; btn.textContent='提交中...';
+      const data={
+        service_id:parseInt(serviceId),
+        service_item_id:selectedItemId?parseInt(selectedItemId):null,
+        service_type:serviceType,
+        user_phone:document.getElementById('user_phone').value.trim(),
+        address_name:serviceType==='outcall'?document.getElementById('address_name').value.trim():(store.address||'门店'),
+        address_detail:document.getElementById('address_detail').value.trim(),
+        lat:serviceType==='outcall'?(parseFloat(document.getElementById('lat').value)||null):(store.lat||null),
+        lng:serviceType==='outcall'?(parseFloat(document.getElementById('lng').value)||null):(store.lng||null),
+        appointment_date:document.getElementById('appointment_date').value,
+        appointment_time:document.getElementById('appointment_time').value,
+        remark:document.getElementById('remark').value.trim()
+      };
+      if(serviceType==='outcall' && !data.address_name){
+        msg.className='mt-4 text-center text-sm text-red-500';msg.textContent='请填写上门地址';msg.classList.remove('hidden');
+        btn.disabled=false;btn.textContent='确认预约并提交';return;
+      }
+      try{
+        const res=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+        const result=await res.json();
+        if(!res.ok) throw new Error(result.detail||'提交失败');
+        msg.className='mt-4 text-center text-sm text-green-600 font-medium';
+        msg.textContent='✅ 预约成功！订单 #'+result.id+'';msg.classList.remove('hidden');
+        localStorage.setItem('user_phone',data.user_phone);
+        setTimeout(()=>location.href='/orders.html?phone='+encodeURIComponent(data.user_phone),1500);
+      }catch(err){
+        msg.className='mt-4 text-center text-sm text-red-500';msg.textContent='❌ '+(err.message||'失败');msg.classList.remove('hidden');
+        btn.disabled=false;btn.textContent='确认预约并提交';
+      }
+    });
+    load();
+  </script>
+</body>
+</html>

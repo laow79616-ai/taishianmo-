@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>服务商详情</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body{background:#f8f5f0;-webkit-tap-highlight-color:transparent}
+    .carousel{position:relative;width:100%;overflow:hidden;background:#111}
+    .carousel-track{display:flex;transition:transform .45s ease;will-change:transform}
+    .carousel-slide{min-width:100%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#111}
+    .carousel-slide img{width:100%;height:auto;display:block;object-fit:contain;max-height:75vh}
+    .carousel-slide video{width:100%;height:auto;max-height:75vh;display:block;background:#000}
+    .carousel-dots{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:6px;z-index:5}
+    .carousel-dots span{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.45)}
+    .carousel-dots span.on{background:#fff;width:18px;border-radius:4px}
+    .carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:5;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;border:none}
+    .carousel-arrow.left{left:8px}
+    .carousel-arrow.right{right:8px}
+  </style>
+</head>
+<body class="min-h-screen" style="padding-bottom:calc(90px + env(safe-area-inset-bottom))">
+  <header class="bg-rose-800 text-white sticky top-0 z-50 shadow" style="padding-top:env(safe-area-inset-top)">
+    <div class="max-w-lg mx-auto px-4 py-3.5 flex items-center gap-3">
+      <a href="/" class="text-xl px-1">←</a>
+      <h1 class="text-base font-bold">服务商详情</h1>
+    </div>
+  </header>
+  <div id="content" class="max-w-lg mx-auto"><div class="text-center text-gray-400 py-20">加载中...</div></div>
+  <div id="bottom-bar" class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50 hidden" style="padding-bottom:env(safe-area-inset-bottom)">
+    <div class="max-w-lg mx-auto px-4 py-3 flex gap-2" id="bottom-btns">
+      <button onclick="goBook('in_store')" class="flex-1 bg-rose-100 text-rose-800 py-3.5 rounded-xl font-bold text-sm">到店预约</button>
+      <button onclick="goBook('outcall')" class="flex-1 bg-rose-700 text-white py-3.5 rounded-xl font-bold text-sm">上门预约</button>
+    </div>
+  </div>
+  <script>
+    const id=new URLSearchParams(location.search).get('id');
+
+    let lastConsultCount = 0;
+    let consultNotifyReady = false;
+    function playUserConsultSound(){
+      try{
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type='sine'; o.connect(g); g.connect(ctx.destination);
+        o.frequency.value=988; g.gain.value=0.18;
+        o.start();
+        setTimeout(()=>{o.frequency.value=1319},150);
+        setTimeout(()=>{o.stop();ctx.close()},400);
+      }catch(e){}
+    }
+    async function ensureUserNotify(){
+      if(!('Notification' in window)) return;
+      if(Notification.permission==='granted'){consultNotifyReady=true;return}
+      if(Notification.permission!=='denied'){
+        const p=await Notification.requestPermission();
+        consultNotifyReady=(p==='granted');
+      }
+    }
+    function notifyUserNewReply(text){
+      playUserConsultSound();
+      if('Notification' in window && Notification.permission==='granted'){
+        try{
+          const n=new Notification('客服回复了您',{body:(text||'您有新的咨询回复').slice(0,80),tag:'consult-reply'});
+          n.onclick=()=>{window.focus();n.close()};
+        }catch(e){}
+      }
+      // 标题闪烁
+      const raw=document.title.replace(/^【客服回复】/,'');
+      document.title='【客服回复】'+raw;
+      setTimeout(()=>{document.title=raw},6000);
+    }
+
+    let bookingOpen=true;
+    let slideIndex=0, slideTimer=null, slideCount=0;
+
+    function buildCarousel(slides){
+      if(!slides.length) return '<div class="w-full h-40 bg-gray-200 flex items-center justify-center text-gray-400 text-sm">暂无图片</div>';
+      const slidesHtml=slides.map(s=>{
+        if(s.type==='video'){
+          return `<div class="carousel-slide"><video src="${s.src}" controls playsinline webkit-playsinline muted autoplay loop preload="auto"></video></div>`;
+        }
+        return `<div class="carousel-slide"><img src="${s.src}" alt=""></div>`;
+      }).join('');
+      const dots=slides.map((_,i)=>`<span class="${i===0?'on':''}" data-i="${i}"></span>`).join('');
+      return `<div class="carousel" id="media-carousel">
+        <div class="carousel-track" id="carousel-track">${slidesHtml}</div>
+        ${slides.length>1?`<button type="button" class="carousel-arrow left" onclick="goSlide(-1)">‹</button>
+        <button type="button" class="carousel-arrow right" onclick="goSlide(1)">›</button>
+        <div class="carousel-dots" id="carousel-dots">${dots}</div>`:''}
+      </div>`;
+    }
+
+    function goSlide(dir){
+      if(slideCount<=1) return;
+      slideIndex=(slideIndex+dir+slideCount)%slideCount;
+      const track=document.getElementById('carousel-track');
+      if(track) track.style.transform=`translateX(-${slideIndex*100}%)`;
+      document.querySelectorAll('#carousel-dots span').forEach((el,i)=>{
+        el.className=i===slideIndex?'on':'';
+      });
+      // pause videos not in view
+      document.querySelectorAll('#carousel-track video').forEach((v,i)=>{
+        try{
+          if(i===slideIndex){ v.muted=true; v.play().catch(()=>{}); }
+          else { v.pause(); }
+        }catch(e){}
+      });
+      resetAutoSlide();
+    }
+
+    function resetAutoSlide(){
+      if(slideTimer) clearInterval(slideTimer);
+      if(slideCount<=1) return;
+      slideTimer=setInterval(()=>goSlide(1), 4000);
+    }
+
+    function bindSwipe(){
+      const el=document.getElementById('media-carousel');
+      if(!el||slideCount<=1) return;
+      let startX=0, dx=0;
+      el.addEventListener('touchstart',e=>{startX=e.touches[0].clientX;dx=0;if(slideTimer)clearInterval(slideTimer)},{passive:true});
+      el.addEventListener('touchmove',e=>{dx=e.touches[0].clientX-startX},{passive:true});
+      el.addEventListener('touchend',()=>{
+        if(dx>40) goSlide(-1);
+        else if(dx<-40) goSlide(1);
+        else resetAutoSlide();
+      });
+    }
+
+    async function load(){
+      if(!id){location.href='/';return}
+      try{
+        const [s, st]=await Promise.all([
+          fetch('/api/services/'+id).then(r=>r.json()),
+          fetch('/api/store').then(r=>r.json()).catch(()=>({booking_open:true}))
+        ]);
+        bookingOpen = (s.accepting!==0 && s.accepting!=='0') && (st.booking_open!==false);
+        document.getElementById('bottom-bar').classList.remove('hidden');
+        if(!bookingOpen){
+          document.getElementById('bottom-btns').innerHTML=
+            '<div class="w-full bg-red-50 text-red-800 text-center text-sm font-medium py-3.5 rounded-xl">⏸ 服务中，暂不可预约</div>';
+        }
+
+        // 按上传资源顺序：视频、图片（均保持原始比例）
+        const slides=[];
+        // 图片永远排第一
+        if(s.image_url) slides.push({type:'image', src:s.image_url});
+        if(Array.isArray(s.images)){
+          s.images.forEach(u=>{ if(u && u!==s.image_url) slides.push({type:'image', src:u}); });
+        }
+        if(s.video_url) slides.push({type:'video', src:s.video_url});
+        slideCount=slides.length;
+        slideIndex=0;
+        const media=buildCarousel(slides);
+
+        const mapBtn=s.store&&s.store.map_url
+          ?`<a href="${s.store.map_url}" target="_blank" class="inline-flex items-center gap-1 mt-2 text-sm text-rose-700 font-medium">📍 打开地图导航</a>`:'';
+        const statusBadge=bookingOpen
+          ?`<span class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-800 font-medium">✅ 可预约</span>`
+          :`<span class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-800 font-medium">⏸ 服务中 · 不可预约</span>`;
+
+        document.getElementById('content').innerHTML=`
+          <div class="bg-white overflow-hidden">${media}
+            <div class="p-5">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex-1"><h2 class="text-xl font-bold">${s.name}</h2>${s.country?`<p class="text-sm text-gray-500 mt-0.5">🌍 ${s.country}</p>`:''}</div>
+                ${statusBadge}
+              </div>
+              <div class="mt-3 space-y-2 text-sm" id="price-block">
+                ${(s.items&&s.items.length)?s.items.map(it=>`
+                  <div class="border rounded-xl px-3 py-2.5 flex justify-between items-center">
+                    <div><p class="font-medium">${it.name}</p><p class="text-xs text-gray-400">${it.duration}分钟${it.description?' · '+it.description:''}</p></div>
+                    <div class="text-right"><p class="text-rose-700 font-bold">门店 ¥${it.price_in_store}</p><p class="text-rose-700 text-xs">外出 ¥${it.price_outcall}</p></div>
+                  </div>`).join(''):`
+                  <p>门店价格 <span class="text-rose-700 font-bold text-lg">¥${s.price_in_store||0}</span></p>
+                  <p>外出价格 <span class="text-rose-700 font-bold text-lg">¥${s.price_outcall||0}</span></p>
+                  <p class="text-gray-500">⏱ ${s.duration} 分钟</p>`}
+              </div>
+              ${!bookingOpen?`<div class="mt-3 bg-red-50 border border-red-100 text-red-800 text-sm rounded-xl px-3 py-2.5">当前服务商正在服务中，暂时无法预约。请稍后再试。</div>`:''}
+              ${s.store?`<div class="mt-4 pt-3 border-t text-sm text-gray-600">
+                <p class="font-medium text-gray-700">门店地址</p>
+                <p class="mt-1">${s.store.address||''}</p>${mapBtn}
+              </div>`:''}
+              <div class="mt-4 pt-3 border-t">
+                <h3 class="font-semibold text-sm text-gray-700 mb-1">服务商介绍</h3>
+                <p class="text-gray-600 text-sm leading-relaxed whitespace-pre-line">${s.description||'暂无介绍'}</p>
+              </div>
+              <p class="mt-4 text-xs text-rose-800 bg-rose-50 rounded-xl px-3 py-2">${s.payment_note||'见面收取费用，支持 USD / 支付宝 / 微信'}</p>
+              <div class="mt-5 pt-4 border-t">
+                <h3 class="font-semibold text-sm text-gray-700 mb-2">💬 在线咨询</h3>
+                <p class="text-xs text-gray-400 mb-2">填写手机号后可直接对话；有新回复会提示音（请允许浏览器通知）</p>
+                <input id="ask-phone" type="tel" placeholder="您的手机号（必填）" class="w-full border rounded-xl px-3 py-2.5 mb-2 text-sm" style="font-size:16px" onchange="loadConsultChat()" onblur="loadConsultChat()">
+                <div id="consult-box" class="bg-gray-50 rounded-xl p-3 max-h-56 overflow-y-auto space-y-2 mb-2 text-sm min-h-[80px]">
+                  <p class="text-gray-400 text-xs text-center">输入手机号后显示对话</p>
+                </div>
+                <div class="flex gap-2">
+                  <input id="ask-content" type="text" placeholder="输入消息..." class="flex-1 border rounded-xl px-3 py-2.5 text-sm" style="font-size:16px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();sendConsult();}">
+                  <button onclick="sendConsult()" class="bg-rose-700 text-white px-4 rounded-xl text-sm font-semibold flex-shrink-0">发送</button>
+                </div>
+                <p id="ask-msg" class="text-center text-xs mt-2 hidden"></p>
+              </div>
+            </div>
+          </div>`;
+        bindSwipe();
+        resetAutoSlide();
+        const saved=localStorage.getItem('user_phone');
+        if(saved){ const inp=document.getElementById('ask-phone'); if(inp){ inp.value=saved; loadConsultChat(); } }
+        if(window._consultPoll) clearInterval(window._consultPoll);
+        ensureUserNotify();
+        window._consultPoll=setInterval(()=>{ const ph=document.getElementById('ask-phone'); if(ph&&ph.value.trim()) loadConsultChat(true); }, 5000);
+      }catch(e){document.getElementById('content').innerHTML='<p class="text-center text-red-400 py-20">服务不存在</p>'}
+    }
+    async function loadConsultChat(fromPoll){
+      const phone=document.getElementById('ask-phone').value.trim();
+      const box=document.getElementById('consult-box');
+      if(!box) return;
+      if(!phone){box.innerHTML='<p class="text-gray-400 text-xs text-center">输入手机号后显示对话</p>';return}
+      try{
+        const list=await (await fetch('/api/messages/'+encodeURIComponent(phone))).json();
+        const adminMsgs=list.filter(m=>m.role==='admin');
+        const adminCount=adminMsgs.length;
+        if(fromPoll && adminCount>lastConsultCount && lastConsultCount>0){
+          const last=adminMsgs[adminMsgs.length-1];
+          notifyUserNewReply(last&&last.content);
+        }
+        // 首次加载只记数量不响
+        if(lastConsultCount===0 && adminCount>0 && !fromPoll) lastConsultCount=adminCount;
+        else if(fromPoll || lastConsultCount===0) lastConsultCount=adminCount;
+        else lastConsultCount=adminCount;
+
+        if(!list.length){box.innerHTML='<p class="text-gray-400 text-xs text-center">暂无消息，发送第一条开始咨询</p>';return}
+        box.innerHTML=list.map(m=>`<div class="flex ${m.role==='user'?'justify-end':''}">
+          <div class="max-w-[85%] rounded-xl px-3 py-2 ${m.role==='user'?'bg-rose-100 text-rose-900':'bg-green-100 text-green-900 border border-green-200'}">
+            <p class="text-[10px] text-gray-400 mb-0.5">${m.role==='user'?'我':'客服'}</p>
+            ${m.content}
+            <div class="text-[10px] text-gray-400 mt-0.5">${m.created_at||''}</div>
+          </div>
+        </div>`).join('');
+        box.scrollTop=box.scrollHeight;
+        // 标记已读：记录最大消息 id
+        if(list.length){
+          const maxId=Math.max(...list.map(m=>m.id||0));
+          const prev=parseInt(localStorage.getItem('msg_read_max_'+phone)||'0');
+          if(maxId>prev) localStorage.setItem('msg_read_max_'+phone, String(maxId));
+        }
+      }catch(e){box.innerHTML='<p class="text-red-400 text-xs text-center">加载失败</p>'}
+    }
+    async function sendConsult(){
+      const phone=document.getElementById('ask-phone').value.trim();
+      const content=document.getElementById('ask-content').value.trim();
+      const msg=document.getElementById('ask-msg');
+      if(!phone){msg.className='text-center text-xs mt-2 text-red-500';msg.textContent='请先填写手机号';msg.classList.remove('hidden');return}
+      if(!content){msg.className='text-center text-xs mt-2 text-red-500';msg.textContent='请输入消息';msg.classList.remove('hidden');return}
+      try{
+        const res=await fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_phone:phone,content,service_id:parseInt(id),role:'user'})});
+        const data=await res.json();
+        if(!res.ok) throw new Error(data.detail||'发送失败');
+        document.getElementById('ask-content').value='';
+        localStorage.setItem('user_phone', phone);
+        msg.classList.add('hidden');
+        await loadConsultChat();
+      }catch(e){msg.className='text-center text-xs mt-2 text-red-500';msg.textContent=e.message||'失败';msg.classList.remove('hidden')}
+    }
+    function goBook(type){
+      if(!bookingOpen){alert('当前服务中，暂不可预约');return}
+      location.href='/book.html?id='+id+'&type='+type;
+    }
+    load();
+  </script>
+</body>
+</html>

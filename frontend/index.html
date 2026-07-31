@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>泰美国际养生 · 在线预约</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{background:#f8f5f0;-webkit-tap-highlight-color:transparent}.card-hover:active{transform:scale(0.98)}</style>
+</head>
+<body class="min-h-screen" style="padding-bottom:calc(16px + env(safe-area-inset-bottom))">
+  <header class="bg-rose-800 text-white sticky top-0 z-50 shadow" style="padding-top:env(safe-area-inset-top)">
+    <div class="max-w-lg mx-auto px-4 py-3.5 flex justify-between items-center">
+      <h1 class="text-lg font-bold">🌿 泰美国际养生</h1>
+      <a href="/orders.html" class="text-sm bg-rose-700/80 px-3.5 py-2 rounded-full">我的订单</a>
+    </div>
+  </header>
+  <div class="bg-gradient-to-r from-rose-700 to-rose-900 text-white text-center py-6 px-4">
+    <h2 class="text-xl font-bold mb-1">专业泰式按摩 · 上门服务</h2>
+    <p class="text-rose-100 text-sm">选服务 → 到店/上门 → 约时间 → 下单</p>
+  </div>
+  <div id="closed-banner" class="hidden max-w-lg mx-auto px-3 pt-3">
+    <div class="bg-red-50 border border-red-200 text-red-800 text-sm rounded-2xl px-4 py-3 text-center font-medium">⏸ 服务中，暂不可预约，请稍后再试</div>
+  </div>
+  <main class="max-w-lg mx-auto px-3 py-4">
+    <h3 class="text-base font-semibold text-gray-800 mb-3 px-1">选择服务商</h3>
+    <div id="service-list" class="grid grid-cols-1 gap-3"><div class="text-center text-gray-400 py-12">加载中...</div></div>
+  </main>
+  <script>
+    async function checkBooking(){
+      try{
+        const s=await (await fetch('/api/store')).json();
+        if(s.booking_open===false){
+          document.getElementById('closed-banner').classList.remove('hidden');
+        }
+      }catch(e){}
+    }
+    let bookingOpen=true;
+    async function loadUnreadBadges(){
+      const phone=localStorage.getItem('user_phone')||'';
+      if(!phone) return;
+      const afterId=parseInt(localStorage.getItem('msg_read_max_'+phone)||'0');
+      try{
+        const data=await (await fetch('/api/messages/'+encodeURIComponent(phone)+'/unread?after_id='+afterId)).json();
+        const map={};
+        (data.by_service||[]).forEach(x=>{ map[String(x.service_id||0)]=x.count; });
+        // also count service_id 0 as global? skip
+        document.querySelectorAll('span[data-svc-id]').forEach(el=>{
+          const id=el.getAttribute('data-svc-id');
+          const n=map[id]||0;
+          let badge=el.querySelector('.unread-badge');
+          if(n>0){
+            if(!badge){
+              badge=document.createElement('span');
+              badge.className='unread-badge text-[11px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-md mr-1.5 whitespace-nowrap';
+              el.insertBefore(badge, el.firstChild);
+            }
+            badge.textContent='消息'+(n>99?'99+':n);
+            badge.style.display='inline';
+          }else if(badge){ badge.style.display='none'; }
+        });
+      }catch(e){}
+    }
+    async function loadServices(){
+      try{const st=await (await fetch('/api/store')).json();bookingOpen=st.booking_open!==false;checkBooking();}catch(e){}
+
+      try{
+        const list=await (await fetch('/api/services')).json();
+        const box=document.getElementById('service-list');
+        if(!list.length){box.innerHTML='<p class="text-center text-gray-400 py-10">暂无服务</p>';return}
+        box.innerHTML=list.map(s=>`
+          <div class="bg-white rounded-2xl overflow-hidden shadow-sm card-hover flex relative" data-svc-id="${s.id}" onclick="location.href='/detail.html?id=${s.id}'">
+            <img src="${s.image_url||'https://picsum.photos/400/400'}" class="w-28 h-28 sm:w-32 sm:h-32 object-cover flex-shrink-0" loading="lazy">
+            <div class="p-3 flex-1 min-w-0 flex flex-col justify-between">
+              <div>
+                <div class="flex items-start justify-between gap-1">
+                  <h4 class="font-bold text-gray-800 text-sm leading-snug line-clamp-2">${s.name}</h4>${s.country?`<p class="text-[10px] text-gray-400 mt-0.5">🌍 ${s.country}</p>`:''}
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${(s.accepting===0||s.accepting==='0')?'bg-red-100 text-red-700':'bg-green-100 text-green-700'}">${(s.accepting===0||s.accepting==='0')?'服务中':'可预约'}</span>
+                </div>
+                <p class="text-gray-500 text-xs mt-1 line-clamp-2">${s.description||''}</p>
+              </div>
+              <div class="mt-2 flex items-end justify-between gap-2">
+                <div class="min-w-0">
+                  ${(s.items&&s.items.length)?`<p class="text-rose-700 font-bold text-sm">¥${Math.min(...s.items.map(i=>i.price_in_store))} 起</p><p class="text-[10px] text-gray-400">${s.items.length}个项目</p>`:`<p class="text-rose-700 font-bold text-sm">¥${s.price_in_store||0}</p><p class="text-[10px] text-gray-400">外出¥${s.price_outcall||0}</p>`}
+                </div>
+                <span class="inline-flex flex-shrink-0 items-center" data-svc-id="${s.id}">
+                  <span class="${(s.accepting===0||s.accepting==='0')?'bg-gray-200 text-gray-500':'bg-rose-700 text-white'} text-xs px-2.5 py-1.5 rounded-lg font-medium">${(s.accepting===0||s.accepting==='0')?'不可约':'预约'}</span>
+                </span>
+              </div>
+            </div>
+          </div>`).join('');
+      }catch(e){document.getElementById('service-list').innerHTML='<p class="text-center text-red-400 py-10">加载失败</p>'}
+    }
+    loadServices().then(()=>loadUnreadBadges()); setInterval(loadUnreadBadges, 10000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>后台登录 · 泰式按摩</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{background:#f8f5f0;-webkit-tap-highlight-color:transparent} input{font-size:16px!important}</style>
+</head>
+<body class="min-h-screen flex items-center justify-center px-4">
+  <div class="bg-white rounded-2xl shadow-lg p-6 w-full max-w-sm">
+    <h1 class="text-xl font-bold text-center text-rose-800 mb-6">后台管理登录</h1>
+    <form id="login-form" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">账号</label>
+        <input type="text" id="username" value="admin" required class="w-full border border-gray-300 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-rose-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+        <input type="password" id="password" value="admin123" required class="w-full border border-gray-300 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-rose-500">
+      </div>
+      <button type="submit" class="w-full bg-rose-700 text-white py-3.5 rounded-xl font-bold active:bg-rose-800">登录</button>
+    </form>
+    <p id="msg" class="text-center text-sm mt-4 hidden"></p>
+    <p class="text-center text-xs text-gray-400 mt-5">默认账号 admin / admin123</p>
+  </div>
+  <script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('msg');
+      try {
+        const res = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '登录失败');
+        localStorage.setItem('admin_token', data.token);
+        location.href = '/admin.html';
+      } catch (err) {
+        msg.className = 'text-center text-sm mt-4 text-red-500';
+        msg.textContent = err.message;
+        msg.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

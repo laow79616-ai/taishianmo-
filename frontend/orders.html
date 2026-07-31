@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>我的订单</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{background:#f8f5f0;-webkit-tap-highlight-color:transparent}input{font-size:16px!important}</style>
+</head>
+<body class="min-h-screen" style="padding-bottom:calc(20px + env(safe-area-inset-bottom))">
+  <header class="bg-rose-800 text-white sticky top-0 z-50 shadow" style="padding-top:env(safe-area-inset-top)">
+    <div class="max-w-lg mx-auto px-4 py-3.5 flex items-center gap-3">
+      <a href="/" class="text-xl px-1">←</a>
+      <h1 class="text-base font-bold">我的订单</h1>
+    </div>
+  </header>
+  <main class="max-w-lg mx-auto px-3 py-4">
+    <div class="bg-white rounded-2xl p-4 shadow-sm mb-4">
+      <label class="block text-sm font-semibold text-gray-700 mb-2">输入手机号查看订单</label>
+      <div class="flex gap-2">
+        <input type="tel" id="phone" placeholder="手机号码" inputmode="tel" class="flex-1 border border-gray-300 rounded-xl px-3.5 py-3">
+        <button onclick="loadOrders()" class="bg-rose-700 text-white px-5 rounded-xl text-sm font-semibold">查询</button>
+      </div>
+    </div>
+    <div id="order-list"><p class="text-center text-gray-400 py-10 text-sm">请输入手机号查询</p></div>
+
+    </main>
+  <script>
+    const statusMap={
+      pending:{text:'待确认',color:'bg-yellow-100 text-yellow-800',tip:'商家确认后，将在30分钟内到达指定位置'},
+      confirmed:{text:'已确认',color:'bg-blue-100 text-blue-800',tip:'✅ 已确认：技师将在30分钟内到达指定位置，请保持电话畅通'},
+      completed:{text:'已完成',color:'bg-green-100 text-green-800',tip:'服务已完成，感谢您的预约'},
+      cancelled:{text:'已取消',color:'bg-gray-100 text-gray-500',tip:'订单已取消'}
+    };
+    const phoneFromUrl=new URLSearchParams(location.search).get('phone')||localStorage.getItem('user_phone')||'';
+    if(phoneFromUrl){document.getElementById('phone').value=phoneFromUrl;loadOrders()}
+    async function loadOrders(){
+      const phone=document.getElementById('phone').value.trim();
+      if(!phone){alert('请输入手机号');return}
+      localStorage.setItem('user_phone',phone);
+      const box=document.getElementById('order-list');
+      box.innerHTML='<p class="text-center text-gray-400 py-6 text-sm">加载中...</p>';
+      try{
+        const list=await (await fetch('/api/orders/by-phone/'+encodeURIComponent(phone))).json();
+        if(!list.length){box.innerHTML='<p class="text-center text-gray-400 py-10 text-sm">暂无订单</p>';return}
+        document.getElementById('chat-section').classList.remove('hidden'); loadUserMsgs(phone);
+        box.innerHTML=list.map(o=>{
+          const st=statusMap[o.status]||statusMap.pending;
+          const typeLabel=o.service_type==='outcall'?'外出上门':'到店';
+          return `<div class="bg-white rounded-2xl p-4 shadow-sm mb-3">
+            <div class="flex justify-between items-start gap-2">
+              <div><h3 class="font-bold text-gray-800 text-sm">${o.service_name}</h3>
+              <p class="text-xs text-gray-400 mt-0.5">订单 #${o.id} · ${typeLabel}</p></div>
+              <span class="text-xs px-2.5 py-1 rounded-full ${st.color}">${st.text}</span>
+            </div>
+            <div class="mt-3 text-sm text-gray-600 space-y-1.5">
+              <p>📅 ${o.appointment_date} ${o.appointment_time}</p>
+              <p class="break-all">📍 ${o.address_name||''}${o.address_detail?' · '+o.address_detail:''}</p>
+              <p>💰 ¥${o.price||0}${o.taxi_fee?' + 打车¥'+o.taxi_fee:''}</p>
+            </div>
+            <div class="mt-3 text-xs rounded-xl px-3 py-2 ${o.status==='confirmed'?'bg-blue-50 text-blue-800':'bg-gray-50 text-gray-600'}">${st.tip}</div>
+            <p class="text-xs text-gray-400 mt-2">下单：${o.created_at||''}</p>
+          </div>`;
+        }).join('');
+      }catch(e){box.innerHTML='<p class="text-center text-red-400 py-6 text-sm">加载失败</p>'}
+    }
+  
+    async function loadUserMsgs(phone){
+      try{
+        const list=await (await fetch('/api/messages/'+encodeURIComponent(phone))).json();
+        const box=document.getElementById('msg-box');
+        if(!list.length){box.innerHTML='<p class="text-gray-400 text-xs text-center">暂无消息，可在此留言</p>';return}
+        box.innerHTML=list.map(m=>`<div class="flex ${m.role==='user'?'justify-end':''}">
+          <div class="max-w-[80%] rounded-xl px-3 py-2 ${m.role==='user'?'bg-rose-100 text-rose-900':'bg-gray-100'}">${m.content}
+          <div class="text-[10px] text-gray-400 mt-0.5">${m.created_at||''}</div></div>
+        </div>`).join('');
+        box.scrollTop=box.scrollHeight;
+      }catch(e){}
+    }
+    async function sendUserMsg(){
+      const phone=document.getElementById('phone').value.trim();
+      const content=document.getElementById('user-msg').value.trim();
+      if(!phone){alert('请先输入手机号查询');return}
+      if(!content) return;
+      await fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_phone:phone,content,role:'user'})});
+      document.getElementById('user-msg').value='';
+      loadUserMsgs(phone);
+    }
+  </script>
+</body>
+</html>

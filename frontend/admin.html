@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>后台管理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body{background:#f3f4f6;-webkit-tap-highlight-color:transparent}
+    .tab-active{border-bottom:2px solid #9f1239;color:#9f1239;font-weight:600}
+    input,select,textarea{font-size:16px!important}
+  </style>
+</head>
+<body class="min-h-screen" style="padding-bottom:env(safe-area-inset-bottom)">
+  <header class="bg-rose-800 text-white shadow" style="padding-top:env(safe-area-inset-top)">
+    <div class="max-w-lg mx-auto px-4 py-3.5 flex justify-between items-center">
+      <h1 class="text-lg font-bold">🌿 后台管理</h1>
+      <button onclick="logout()" class="text-sm bg-rose-700 px-3 py-1.5 rounded-full">退出</button>
+    </div>
+  </header>
+  <nav class="bg-white border-b sticky top-0 z-40">
+    <div class="max-w-lg mx-auto px-4 flex gap-4 text-sm overflow-x-auto">
+      <button onclick="showTab('dash')" id="tab-dash" class="py-3 tab-active whitespace-nowrap">仪表盘</button>
+      <button onclick="showTab('orders')" id="tab-orders" class="py-3 text-gray-600 whitespace-nowrap">订单</button>
+      <button onclick="showTab('services')" id="tab-services" class="py-3 text-gray-600 whitespace-nowrap">服务商</button>
+      <button onclick="showTab('messages')" id="tab-messages" class="py-3 text-gray-600 whitespace-nowrap">咨询回复</button>
+      <button onclick="showTab('settings')" id="tab-settings" class="py-3 text-gray-600 whitespace-nowrap">门店设置</button>
+    </div>
+  </nav>
+  <main class="max-w-lg mx-auto px-3 py-4">
+    <!-- 仪表盘 -->
+    <div id="panel-dash">
+      <div id="booking-toggle" class="rounded-2xl p-4 shadow-sm mb-4 flex items-center justify-between gap-3">
+        <div>
+          <p class="font-semibold text-sm" id="bk-title">预约状态</p>
+          <p class="text-xs mt-1" id="bk-desc">加载中...</p>
+        </div>
+        <button id="bk-btn" onclick="toggleBooking()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-white flex-shrink-0">切换</button>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="bg-white rounded-2xl p-4 shadow-sm"><p class="text-xs text-gray-400">全部订单</p><p class="text-2xl font-bold mt-1" id="st-total">-</p></div>
+        <div class="bg-white rounded-2xl p-4 shadow-sm"><p class="text-xs text-gray-400">服务商数量</p><p class="text-2xl font-bold mt-1 text-rose-700" id="st-providers">-</p><p class="text-[10px] text-gray-400 mt-1" id="st-providers-sub"></p></div>
+        <div class="bg-white rounded-2xl p-4 shadow-sm"><p class="text-xs text-gray-400">今日订单</p><p class="text-2xl font-bold mt-1 text-rose-700" id="st-today">-</p></div>
+        <div class="bg-yellow-50 rounded-2xl p-4 shadow-sm"><p class="text-xs text-yellow-700">待确认</p><p class="text-2xl font-bold mt-1 text-yellow-800" id="st-pending">-</p></div>
+        <div class="bg-blue-50 rounded-2xl p-4 shadow-sm"><p class="text-xs text-blue-700">已确认</p><p class="text-2xl font-bold mt-1 text-blue-800" id="st-confirmed">-</p></div>
+        <div class="bg-green-50 rounded-2xl p-4 shadow-sm"><p class="text-xs text-green-700">已完成</p><p class="text-2xl font-bold mt-1 text-green-800" id="st-completed">-</p></div>
+        <div class="bg-white rounded-2xl p-4 shadow-sm"><p class="text-xs text-gray-400">营业额(已确认+完成)</p><p class="text-xl font-bold mt-1 text-rose-700" id="st-revenue">-</p></div>
+      </div>
+      <div class="bg-white rounded-2xl p-4 shadow-sm mb-3">
+        <p class="text-sm text-gray-500">上架服务 <span id="st-services" class="font-bold text-gray-800">-</span> 个 · 已取消 <span id="st-cancelled" class="font-bold">-</span></p>
+      </div>
+      <h3 class="text-sm font-semibold text-gray-700 mb-2 px-1">最近订单</h3>
+      <div id="dash-recent"><p class="text-center text-gray-400 py-6 text-sm">加载中...</p></div>
+    </div>
+
+    <!-- 订单 -->
+    <div id="panel-orders" class="hidden">
+      <p class="text-xs text-rose-800 bg-rose-50 rounded-xl px-3 py-2 mb-3">确认订单后用户看到「30分钟内到达」。点 <b>WhatsApp</b> 可一键打开聊天（已填好订单内容）</p>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button onclick="loadOrders()" class="px-3 py-1.5 bg-gray-200 rounded-full text-xs">全部</button>
+        <button onclick="loadOrders('pending')" class="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-full text-xs">待确认</button>
+        <button onclick="loadOrders('confirmed')" class="px-3 py-1.5 bg-blue-100 text-blue-800 rounded-full text-xs">已确认</button>
+        <button onclick="loadOrders('completed')" class="px-3 py-1.5 bg-green-100 text-green-800 rounded-full text-xs">已完成</button>
+        <button onclick="loadOrders('cancelled')" class="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-full text-xs">已取消</button>
+      </div>
+      <div id="order-table"><p class="text-center text-gray-400 py-10 text-sm">加载中...</p></div>
+    </div>
+
+    <!-- 服务 -->
+    <div id="panel-services" class="hidden">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-base font-semibold">服务商列表</h2>
+        <button onclick="showServiceForm()" class="bg-rose-700 text-white px-3.5 py-2 rounded-xl text-sm">+ 新增服务商商</button>
+      </div>
+      <div id="service-table"><p class="text-center text-gray-400 py-10 text-sm">加载中...</p></div>
+    </div>
+
+    <!-- 设置 -->
+    <div id="panel-messages" class="hidden">
+      <p class="text-xs text-gray-500 mb-3">各服务详情页的用户咨询，统一在此回复</p>
+      <div id="msg-threads"><p class="text-center text-gray-400 py-8 text-sm">加载中...</p></div>
+      <div id="msg-chat" class="hidden mt-3 bg-white rounded-2xl p-4 shadow-sm">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-semibold text-sm" id="msg-phone-title">对话</h3>
+          <button onclick="closeMsgChat()" class="text-xs text-gray-500">返回</button>
+        </div>
+        <div id="msg-list" class="max-h-64 overflow-y-auto space-y-2 mb-3 text-sm"></div>
+        <div class="flex gap-2">
+          <input id="msg-reply" class="flex-1 border rounded-xl px-3 py-2.5" placeholder="输入回复...">
+          <button onclick="sendAdminMsg()" class="bg-rose-700 text-white px-4 rounded-xl text-sm">发送</button>
+        </div>
+      </div>
+    </div>
+    <div id="panel-settings" class="hidden">
+      <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+        <h2 class="font-semibold text-base mb-2">门店与打车费设置</h2>
+        <div><label class="text-sm font-medium">门店名称</label><input id="set-name" class="w-full border rounded-xl px-3 py-2.5 mt-1"></div>
+        <div><label class="text-sm font-medium">门店地址</label><input id="set-address" class="w-full border rounded-xl px-3 py-2.5 mt-1"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-sm font-medium">纬度</label><input id="set-lat" class="w-full border rounded-xl px-3 py-2.5 mt-1"></div>
+          <div><label class="text-sm font-medium">经度</label><input id="set-lng" class="w-full border rounded-xl px-3 py-2.5 mt-1"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="text-sm font-medium">打车起步价</label><input id="set-base" type="number" step="0.01" class="w-full border rounded-xl px-3 py-2.5 mt-1"></div>
+          <div><label class="text-sm font-medium">每公里</label><input id="set-perkm" type="number" step="0.01" class="w-full border rounded-xl px-3 py-2.5 mt-1"></div>
+        </div>
+        <div class="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-3">
+          <div><p class="text-sm font-medium">接受预约</p><p class="text-xs text-gray-400">关闭后用户不可下单</p></div>
+          <select id="set-booking" class="border rounded-xl px-3 py-2 bg-white"><option value="1">可预约</option><option value="0">服务中不可预约</option></select>
+        </div>
+        <div><label class="text-sm font-medium">收费说明</label><textarea id="set-note" rows="2" class="w-full border rounded-xl px-3 py-2.5 mt-1"></textarea></div>
+        <div class="border-t pt-3 mt-2">
+          <p class="text-sm font-semibold text-gray-800 mb-2">💬 服务商 WhatsApp</p>
+          <label class="text-sm font-medium">默认联系号码（可选）</label>
+          <input id="set-wa" class="w-full border rounded-xl px-3 py-2.5 mt-1" placeholder="例如 60123456789">
+          <input type="hidden" id="set-wa-key" value="">
+          <p class="text-xs text-gray-400 mt-1">订单列表可一键用 WhatsApp 联系客户；此号码用于快捷备注</p>
+        </div>
+        <div class="border-t pt-3 mt-2">
+          <p class="text-sm font-semibold text-gray-800 mb-2">✈️ Telegram 通知（新订单+咨询）</p>
+          <label class="text-sm font-medium">Bot Token</label>
+          <input id="set-tg-token" class="w-full border rounded-xl px-3 py-2.5 mt-1" placeholder="123456:ABC-DEF...">
+          <label class="text-sm font-medium mt-2 block">Chat ID</label>
+          <input id="set-tg-chat" class="w-full border rounded-xl px-3 py-2.5 mt-1" placeholder="例如 123456789">
+          <p class="text-xs text-gray-400 mt-1">设置方法见下方说明。保存后可点测试</p>
+          <button type="button" onclick="testTelegram()" class="mt-2 w-full border border-rose-300 text-rose-700 py-2.5 rounded-xl text-sm">发送测试消息</button>
+        </div>
+        <div class="border-t pt-3 mt-2">
+          <p class="text-sm font-semibold text-gray-800 mb-2">🗺️ 谷歌地图（上门地址搜索）</p>
+          <label class="text-sm font-medium">Google Maps API Key</label>
+          <input id="set-gmaps" class="w-full border rounded-xl px-3 py-2.5 mt-1" placeholder="可选，不填则用免费地图搜索">
+          <p class="text-xs text-gray-400 mt-1">在 Google Cloud 开通 Places API。不填也能用定位+地址搜索</p>
+        </div>
+        <button onclick="saveSettings()" class="w-full bg-rose-700 text-white py-3 rounded-xl font-bold">保存设置</button>
+        <p id="set-msg" class="text-center text-sm hidden"></p>
+      </div>
+    </div>
+  </main>
+
+  <div id="service-modal" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 hidden">
+    <div class="bg-white rounded-t-2xl p-5 w-full max-w-md max-h-[90vh] overflow-y-auto" style="padding-bottom:calc(20px + env(safe-area-inset-bottom))">
+      <h3 id="modal-title" class="text-lg font-bold mb-4">新增服务商</h3>
+      <form id="service-form" class="space-y-3">
+        <input type="hidden" id="svc-id">
+        <p class="text-xs font-semibold text-rose-800 bg-rose-50 rounded-lg px-2 py-1">① 服务商资料</p>
+        <div><label class="text-sm font-medium">服务商名称 *</label><input id="svc-name" required class="w-full border rounded-xl px-3 py-2.5 mt-1"></div>
+        <div><label class="text-sm font-medium">国家 / 地区</label>
+          <select id="svc-country" class="w-full border rounded-xl px-3 py-2.5 mt-1 bg-white">
+            <option value="">请选择</option>
+            <option value="马来西亚">马来西亚</option>
+            <option value="中国">中国</option>
+            <option value="泰国">泰国</option>
+            <option value="新加坡">新加坡</option>
+            <option value="印度尼西亚">印度尼西亚</option>
+            <option value="越南">越南</option>
+            <option value="菲律宾">菲律宾</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <p class="text-xs font-semibold text-rose-800 bg-rose-50 rounded-lg px-2 py-1 mt-2">② 服务项目与价格</p>
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-sm font-medium">项目列表 *</label>
+            <button type="button" onclick="addItemRow()" class="text-xs bg-rose-100 text-rose-800 px-2.5 py-1 rounded-lg">+ 添加项目</button>
+          </div>
+          <div id="svc-items" class="space-y-2"></div>
+          <p class="text-xs text-gray-400 mt-1">在此为该服务商添加可预约项目（名称、门店价、外出价、时长）</p>
+        </div>
+        <input type="hidden" id="svc-price-store" value="0">
+        <input type="hidden" id="svc-price-out" value="0">
+        <input type="hidden" id="svc-duration" value="60">
+        <div><label class="text-sm font-medium">服务商介绍</label><textarea id="svc-desc" rows="2" class="w-full border rounded-xl px-3 py-2.5 mt-1"></textarea></div>
+        <p class="text-xs font-semibold text-rose-800 bg-rose-50 rounded-lg px-2 py-1 mt-2">③ 图片与视频</p>
+        <div>
+          <label class="text-sm font-medium">服务商图片</label>
+          <div class="flex gap-2 mt-1">
+            <input id="svc-image" class="flex-1 border rounded-xl px-3 py-2.5 text-sm" placeholder="链接或上传">
+            <label class="flex-shrink-0 bg-gray-100 px-3 py-2.5 rounded-xl text-sm cursor-pointer active:bg-gray-200">
+              上传<input type="file" id="svc-image-file" accept="image/*" class="hidden" onchange="uploadFile(this,'svc-image')">
+            </label>
+          </div>
+          <img id="svc-image-preview" class="hidden mt-2 w-full h-40 rounded-xl object-cover bg-gray-100">
+        </div>
+        <div>
+          <label class="text-sm font-medium">视频</label>
+          <div class="flex gap-2 mt-1">
+            <input id="svc-video" class="flex-1 border rounded-xl px-3 py-2.5 text-sm" placeholder="链接或上传">
+            <label class="flex-shrink-0 bg-gray-100 px-3 py-2.5 rounded-xl text-sm cursor-pointer active:bg-gray-200">
+              上传<input type="file" id="svc-video-file" accept="video/*" class="hidden" onchange="uploadFile(this,'svc-video')">
+            </label>
+          </div>
+        </div>
+        <div><label class="text-sm font-medium">状态</label>
+          <select id="svc-status" class="w-full border rounded-xl px-3 py-2.5 mt-1 bg-white"><option value="1">上架</option><option value="0">下架</option></select>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeModal()" class="flex-1 border py-3 rounded-xl text-sm">取消</button>
+          <button type="submit" class="flex-1 bg-rose-700 text-white py-3 rounded-xl text-sm font-medium">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    if(!localStorage.getItem('admin_token')) location.href='/admin-login.html';
+
+    // ===== 新订单/咨询 提示音 + 系统通知 =====
+    let lastMsgCount = parseInt(localStorage.getItem('last_msg_count')||'0');
+    let lastOrderCount = parseInt(localStorage.getItem('last_order_count')||'0');
+    let notifyReady = false;
+
+    function playMsgSound(){
+      try{
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(0.2, ctx.currentTime);
+        o.start();
+        setTimeout(()=>{ o.frequency.value=1100; }, 150);
+        setTimeout(()=>{ o.frequency.value=880; }, 300);
+        setTimeout(()=>{ o.stop(); ctx.close(); }, 450);
+      }catch(e){}
+    }
+
+    async function ensureNotifyPermission(){
+      if(!('Notification' in window)) return false;
+      if(Notification.permission === 'granted'){ notifyReady=true; return true; }
+      if(Notification.permission !== 'denied'){
+        const p = await Notification.requestPermission();
+        notifyReady = (p === 'granted');
+        return notifyReady;
+      }
+      return false;
+    }
+
+    function showSystemNotify(title, body){
+      playMsgSound();
+      if('Notification' in window && Notification.permission === 'granted'){
+        try{
+          const n = new Notification(title, {
+            body: body,
+            icon: '/favicon.ico',
+            tag: 'thai-admin-' + Date.now(),
+            requireInteraction: true
+          });
+          n.onclick = function(){ window.focus(); n.close(); };
+        }catch(e){}
+      }
+      // 页面标题闪烁
+      const raw = document.title.replace(/^【新】/,'');
+      document.title = '【新】' + raw;
+      setTimeout(()=>{ document.title = raw; }, 8000);
+    }
+
+    async function checkNewMessages(play){
+      try{
+        const list = await (await fetch('/api/admin/messages')).json();
+        const total = Array.isArray(list) ? list.reduce((s,m)=>s+(m.count||0),0) : 0;
+        if(play && total > lastMsgCount){
+          showSystemNotify('新咨询留言', '有用户提交了新的咨询，请打开「咨询回复」查看');
+          const tab = document.getElementById('tab-messages');
+          if(tab && !tab.innerText.includes('●')) tab.textContent = '咨询回复 ●';
+        }
+        lastMsgCount = total;
+        localStorage.setItem('last_msg_count', String(total));
+      }catch(e){}
+    }
+
+    async function checkNewOrders(play){
+      try{
+        const list = await (await fetch('/api/admin/orders')).json();
+        const total = Array.isArray(list) ? list.length : 0;
+        const pending = Array.isArray(list) ? list.filter(o=>o.status==='pending').length : 0;
+        if(play && total > lastOrderCount){
+          showSystemNotify('新预约订单', '有新的预约订单（待确认 '+pending+' 单），请及时处理');
+          const tab = document.getElementById('tab-orders');
+          if(tab && !tab.innerText.includes('●')) tab.textContent = '订单 ●';
+        }
+        lastOrderCount = total;
+        localStorage.setItem('last_order_count', String(total));
+      }catch(e){}
+    }
+
+    async function pollAlerts(){
+      await checkNewMessages(true);
+      await checkNewOrders(true);
+    }
+
+    // 登录后请求通知权限，并每 10 秒轮询
+    ensureNotifyPermission().then(()=>{
+      pollAlerts();
+      setInterval(pollAlerts, 10000);
+    });
+
+
+    
+
+    function logout(){localStorage.removeItem('admin_token');location.href='/admin-login.html'}
+    function showTab(n){
+      ['dash','orders','services','messages','settings'].forEach(t=>{
+        document.getElementById('panel-'+t).classList.toggle('hidden',t!==n);
+        document.getElementById('tab-'+t).className=t===n?'py-3 tab-active whitespace-nowrap':'py-3 text-gray-600 whitespace-nowrap';
+      });
+      if(n==='dash') loadDash();
+      if(n==='orders'){ loadOrders(); const tab=document.getElementById('tab-orders'); if(tab) tab.textContent='订单'; }
+      if(n==='services') loadServices();
+      if(n==='settings') loadSettings();
+      if(n==='messages'){ loadMsgThreads(); const tab=document.getElementById('tab-messages'); if(tab) tab.textContent='咨询回复'; }
+    }
+    const statusMap={pending:{text:'待确认',next:['confirmed','cancelled']},confirmed:{text:'已确认',next:['completed','cancelled']},completed:{text:'已完成',next:[]},cancelled:{text:'已取消',next:[]}};
+
+    
+    let bookingOpen = true;
+    async function refreshBookingStatus(){
+      try{
+        const s = await (await fetch('/api/admin/settings')).json();
+        bookingOpen = (s.booking_open||'1')==='1';
+        const box=document.getElementById('booking-toggle');
+        const title=document.getElementById('bk-title');
+        const desc=document.getElementById('bk-desc');
+        const btn=document.getElementById('bk-btn');
+        if(bookingOpen){
+          box.className='rounded-2xl p-4 shadow-sm mb-4 flex items-center justify-between gap-3 bg-green-50 border border-green-200';
+          title.textContent='✅ 当前可预约';
+          desc.textContent='用户可以正常下单';
+          btn.textContent='暂停预约（服务中）';
+          btn.className='px-4 py-2.5 rounded-xl text-sm font-bold text-white flex-shrink-0 bg-rose-600';
+        }else{
+          box.className='rounded-2xl p-4 shadow-sm mb-4 flex items-center justify-between gap-3 bg-red-50 border border-red-200';
+          title.textContent='⏸ 服务中 · 不可预约';
+          desc.textContent='用户端显示暂不可预约，由你重新开启';
+          btn.textContent='打开预约';
+          btn.className='px-4 py-2.5 rounded-xl text-sm font-bold text-white flex-shrink-0 bg-green-600';
+        }
+      }catch(e){}
+    }
+    async function toggleBooking(){
+      const next = bookingOpen ? '0' : '1';
+      const tip = bookingOpen ? '确认暂停预约？用户将无法下单（服务中）' : '确认重新打开预约？';
+      if(!confirm(tip)) return;
+      await fetch('/api/admin/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({booking_open:next})});
+      await refreshBookingStatus();
+    }
+
+    async function loadDash(){
+      refreshBookingStatus();
+      checkNewMessages(true);
+      const s=await (await fetch('/api/admin/stats')).json();
+      document.getElementById('st-total').textContent=s.total_orders;
+      document.getElementById('st-today').textContent=s.today_orders;
+      document.getElementById('st-pending').textContent=s.pending;
+      document.getElementById('st-confirmed').textContent=s.confirmed;
+      document.getElementById('st-completed').textContent=s.completed;
+      document.getElementById('st-cancelled').textContent=s.cancelled;
+      document.getElementById('st-revenue').textContent='¥'+Number(s.revenue||0).toFixed(0);
+      document.getElementById('st-services').textContent=s.active_services;
+      if(document.getElementById('st-providers')){
+        document.getElementById('st-providers').textContent=s.providers_total!=null?s.providers_total:s.active_services;
+        const sub=document.getElementById('st-providers-sub');
+        if(sub) sub.textContent='上架 '+(s.active_services||0)+' · 可预约 '+(s.providers_accepting!=null?s.providers_accepting:s.active_services);
+      }
+      const box=document.getElementById('dash-recent');
+      if(!s.recent_orders.length){box.innerHTML='<p class="text-center text-gray-400 py-6 text-sm">暂无订单</p>';return}
+      box.innerHTML=s.recent_orders.map(o=>{
+        const st=statusMap[o.status]||statusMap.pending;
+        const act = o.status==='pending' ? `<button onclick="updateStatus(${o.id},'confirmed')" class="text-xs px-2 py-1 rounded-lg bg-rose-600 text-white">确认</button>` : '';
+        return `<div class="bg-white rounded-2xl p-3 shadow-sm mb-2">
+          <div class="flex justify-between items-center gap-2">
+            <div class="min-w-0"><p class="font-medium text-sm truncate">${o.service_name}</p>
+            <p class="text-xs text-gray-400">#${o.id} · ${o.user_phone} · ${o.appointment_date}</p></div>
+            <span class="text-xs px-2 py-1 rounded-full flex-shrink-0 ${o.status==='pending'?'bg-yellow-100 text-yellow-800':o.status==='confirmed'?'bg-blue-100 text-blue-800':o.status==='completed'?'bg-green-100 text-green-800':'bg-gray-100 text-gray-500'}">${st.text}</span>
+          </div>
+          ${act?`<div class="mt-2">${act}</div>`:''}
+        </div>`;
+      }).join('');
+    }
+
+    async function loadOrders(status){
+      const res=await fetch(status?'/api/admin/orders?status='+status:'/api/admin/orders');
+      const list=await res.json();
+      const box=document.getElementById('order-table');
+      if(!list.length){box.innerHTML='<p class="text-center text-gray-400 py-10 text-sm">暂无订单</p>';return}
+      box.innerHTML=list.map(o=>{
+        const st=statusMap[o.status]||statusMap.pending;
+        const actions=st.next.map(s=>{
+          const label={confirmed:'确认(30分钟到达)',completed:'完成',cancelled:'取消'}[s];
+          return `<button onclick="updateStatus(${o.id},'${s}')" class="text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 mr-1 mb-1">${label}</button>`;
+        }).join('');
+        const waBtn = `<button onclick='openWhatsApp(${JSON.stringify(o).replace(/'/g,"&#39;")})' class="text-xs px-2.5 py-1.5 rounded-lg bg-green-100 text-green-800 mr-1 mb-1">💬 WhatsApp</button>`;
+        const typeLabel=o.service_type==='outcall'?'外出上门':'到店';
+        return `<div class="bg-white rounded-2xl p-4 shadow-sm mb-3">
+          <div class="flex justify-between items-start gap-2">
+            <div><h3 class="font-bold text-sm">${o.service_name}</h3>
+            <p class="text-xs text-gray-400 mt-0.5">#${o.id} · ${o.user_phone} · ${typeLabel}</p></div>
+            <span class="text-xs px-2 py-1 rounded-full ${o.status==='pending'?'bg-yellow-100 text-yellow-800':o.status==='confirmed'?'bg-blue-100 text-blue-800':o.status==='completed'?'bg-green-100 text-green-800':'bg-gray-100 text-gray-500'}">${st.text}</span>
+          </div>
+          <div class="mt-2 text-sm text-gray-600 space-y-1">
+            <p>📅 ${o.appointment_date} ${o.appointment_time}</p>
+            <p class="break-all">📍 ${o.address_name||''}${o.address_detail?' · '+o.address_detail:''}</p>
+            <p>💰 ¥${o.price||0}${o.taxi_fee? ' + 打车¥'+o.taxi_fee:''}</p>
+            ${o.status==='confirmed'?'<p class="text-blue-700 text-xs bg-blue-50 rounded-lg px-2 py-1">⏱ 已通知用户：30分钟内到达</p>':''}
+            ${o.remark?'<p>📝 '+o.remark+'</p>':''}
+          </div>
+          <div class="mt-3 flex flex-wrap">${waBtn}${actions||''}</div>
+        </div>`;
+      }).join('');
+    }
+    function openWhatsApp(o){
+      const phone = String(o.user_phone||'').replace(/[^0-9]/g,'');
+      const typeLabel = o.service_type==='outcall'?'上门':'到店';
+      const text = `【新订单 #${o.id}】\n服务: ${o.service_name}（${typeLabel}）\n客户电话: ${o.user_phone}\n时间: ${o.appointment_date} ${o.appointment_time}\n地址: ${o.address_name||''}${o.address_detail?' '+o.address_detail:''}\n金额: ¥${o.price||0}${o.taxi_fee?' +打车¥'+o.taxi_fee:''}\n备注: ${o.remark||'无'}\n请确认预约，确认后30分钟内到达。`;
+      // 优先打开与客户的聊天（已填好订单内容，可直接发）
+      const url = phone
+        ? 'https://wa.me/' + phone + '?text=' + encodeURIComponent(text)
+        : 'https://wa.me/?text=' + encodeURIComponent(text);
+      window.open(url, '_blank');
+    }
+    async function updateStatus(id,status){
+      const tip=status==='confirmed'?'确认后用户将看到「30分钟内到达」提示，确定？':'确认修改状态？';
+      if(!confirm(tip)) return;
+      try{
+        const res=await fetch('/api/admin/orders/'+id+'/status',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status})});
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok) throw new Error(data.detail||'更新失败');
+        alert('状态已更新');
+        loadOrders();
+        if(typeof loadDash==='function') loadDash();
+      }catch(e){ alert(e.message||'更新失败'); }
+    }
+    async function loadServices(){
+      const box=document.getElementById('service-table');
+      let list=[];
+      try{
+        const res=await fetch('/api/admin/services');
+        list=await res.json();
+        if(!res.ok) throw new Error(list.detail||'加载失败');
+      }catch(e){ box.innerHTML='<p class="text-center text-red-500 py-10 text-sm">加载失败: '+(e.message||e)+'</p>'; return; }
+      if(!Array.isArray(list)||!list.length){box.innerHTML='<p class="text-center text-gray-400 py-10 text-sm">暂无服务商，请点击右上角新增</p>';return}
+      box.innerHTML=list.map(s=>{
+        const acc = (s.accepting===0||s.accepting==='0')?0:1;
+        return `<div class="bg-white rounded-2xl p-4 shadow-sm mb-3">
+        <div class="flex justify-between items-start gap-2">
+          <div class="min-w-0 flex-1"><h3 class="font-bold text-sm">👤 ${s.name}</h3>${s.country?`<p class="text-xs text-gray-500 mt-0.5">🌍 ${s.country}</p>`:''}
+          <p class="text-sm mt-1">${(s.items&&s.items.length)?s.items.map(it=>it.name+' ¥'+it.price_in_store+'/'+it.price_outcall).join(' · '):('门店 ¥'+(s.price_in_store||0)+' · 外出 ¥'+(s.price_outcall||0))}</p>
+          <p class="text-xs mt-1 ${s.status?'text-green-600':'text-gray-400'}">${s.status?'上架':'下架'}</p>
+          <div class="mt-2 flex items-center gap-2">
+            <span class="text-xs px-2 py-1 rounded-full ${acc?'bg-green-100 text-green-800':'bg-red-100 text-red-700'}">${acc?'✅ 可预约':'⏸ 服务中'}</span>
+            <button onclick="toggleAccepting(${s.id},${acc?0:1})" class="text-xs px-2.5 py-1.5 rounded-lg ${acc?'bg-amber-100 text-amber-800':'bg-green-100 text-green-800'}">${acc?'设为服务中':'设为可预约'}</button>
+          </div>
+          </div>
+          <div class="flex flex-col gap-1">
+            <button onclick='editService(${JSON.stringify(s).replace(/'/g,"&#39;")})' class="text-xs px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg">编辑</button>
+            <button onclick="deleteService(${s.id})" class="text-xs px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg">删除</button>
+          </div>
+        </div></div>`;
+      }).join('');
+    }
+    function addItemRow(data){
+      data = data || {name:'', price_in_store:'', price_outcall:'', duration:60};
+      const box = document.getElementById('svc-items');
+      const div = document.createElement('div');
+      div.className = 'border rounded-xl p-2.5 bg-gray-50 space-y-2 item-row';
+      div.innerHTML = `
+        <div class="flex gap-2">
+          <input class="item-name flex-1 border rounded-lg px-2 py-2 text-sm" placeholder="项目名称，如：古法按摩60分钟" value="${(data.name||'').replace(/"/g,'&quot;')}">
+          <button type="button" onclick="this.closest('.item-row').remove()" class="text-red-500 text-xs px-2">删</button>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div><label class="text-[10px] text-gray-500">门店价</label><input type="number" step="0.01" class="item-store w-full border rounded-lg px-2 py-1.5 text-sm" value="${data.price_in_store||''}"></div>
+          <div><label class="text-[10px] text-gray-500">外出价</label><input type="number" step="0.01" class="item-out w-full border rounded-lg px-2 py-1.5 text-sm" value="${data.price_outcall||''}"></div>
+          <div><label class="text-[10px] text-gray-500">分钟</label><input type="number" class="item-dur w-full border rounded-lg px-2 py-1.5 text-sm" value="${data.duration||60}"></div>
+        </div>
+        <input class="item-desc w-full border rounded-lg px-2 py-1.5 text-sm" placeholder="项目描述（可选）" value="${(data.description||'').replace(/"/g,'&quot;')}">`;
+      box.appendChild(div);
+    }
+    function collectItems(){
+      const rows = document.querySelectorAll('#svc-items .item-row');
+      const items = [];
+      rows.forEach(r=>{
+        const name = r.querySelector('.item-name').value.trim();
+        if(!name) return;
+        items.push({
+          name,
+          price_in_store: parseFloat(r.querySelector('.item-store').value)||0,
+          price_outcall: parseFloat(r.querySelector('.item-out').value)||0,
+          duration: parseInt(r.querySelector('.item-dur').value)||60,
+          description: (r.querySelector('.item-desc')&&r.querySelector('.item-desc').value)||''
+        });
+      });
+      return items;
+    }
+    async function uploadFile(input, targetId){
+      const file = input.files && input.files[0];
+      if(!file) return;
+      // 视频建议压缩到 30MB 以内
+      if(file.size > 40*1024*1024){
+        alert('文件过大（'+Math.round(file.size/1024/1024)+'MB）。请压缩到 30MB 以内再传，或用手机自带压缩');
+        input.value='';
+        return;
+      }
+      const fd = new FormData();
+      fd.append('file', file);
+      try{
+        const res = await fetch('/api/admin/upload', {method:'POST', body:fd});
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); }
+        catch(e){
+          throw new Error('服务器未返回JSON（可能文件太大被拦截）。请压缩视频到20MB内重试。状态:'+res.status);
+        }
+        if(!res.ok) throw new Error((data.detail&&(data.detail.msg||data.detail))||data.message||'上传失败');
+        document.getElementById(targetId).value = data.url;
+        if(targetId==='svc-image'){
+          const prev=document.getElementById('svc-image-preview');
+          prev.src = data.url;
+          prev.classList.remove('hidden');
+        }
+        alert('上传成功');
+      }catch(e){ alert(e.message||'上传失败'); }
+      input.value = '';
+    }
+    function showServiceForm(svc){
+      document.getElementById('service-modal').classList.remove('hidden');
+      document.getElementById('modal-title').textContent=svc?'编辑服务商':'新增服务商';
+      document.getElementById('svc-id').value=svc?svc.id:'';
+      document.getElementById('svc-name').value=svc?svc.name:'';
+      document.getElementById('svc-country').value=svc?(svc.country||''):'';
+      document.getElementById('svc-items').innerHTML='';
+      if(svc && svc.items && svc.items.length){
+        svc.items.forEach(it=>addItemRow(it));
+      } else if(svc){
+        addItemRow({name:svc.name||'默认项目', price_in_store:svc.price_in_store, price_outcall:svc.price_outcall, duration:svc.duration});
+      } else {
+        addItemRow({name:'', price_in_store:'', price_outcall:'', duration:60});
+      }
+      document.getElementById('svc-price-store').value=svc?(svc.price_in_store||0):0;
+      document.getElementById('svc-price-out').value=svc?(svc.price_outcall||0):0;
+      document.getElementById('svc-duration').value=svc?(svc.duration||60):60;
+      document.getElementById('svc-desc').value=svc?(svc.description||''):'';
+      document.getElementById('svc-image').value=svc?(svc.image_url||''):'';
+      const prev=document.getElementById('svc-image-preview');
+      if(svc && svc.image_url){ prev.src=svc.image_url; prev.classList.remove('hidden'); }
+      else { prev.classList.add('hidden'); prev.src=''; }
+      document.getElementById('svc-video').value=svc?(svc.video_url||''):'';
+      document.getElementById('svc-status').value=svc?svc.status:1;
+    }
+    function editService(s){showServiceForm(s)}
+    function closeModal(){document.getElementById('service-modal').classList.add('hidden')}
+    document.getElementById('service-form').addEventListener('submit',async e=>{
+      e.preventDefault();
+      const id=document.getElementById('svc-id').value;
+      const items=collectItems();
+      if(!items.length){alert('请至少添加一个服务项目（点 +添加项目）');return}
+      const name=document.getElementById('svc-name').value.trim();
+      if(!name){alert('请填写服务商名称');return}
+      const body={name,country:document.getElementById('svc-country').value,price_in_store:items[0].price_in_store,price_outcall:items[0].price_outcall,duration:items[0].duration,description:document.getElementById('svc-desc').value,image_url:document.getElementById('svc-image').value,video_url:document.getElementById('svc-video').value,status:parseInt(document.getElementById('svc-status').value||'1'),items};
+      try{
+        const res=await fetch(id?'/api/admin/services/'+id:'/api/admin/services',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok) throw new Error(data.detail||('保存失败 '+res.status));
+        closeModal();
+        loadServices();
+        alert(id?'已更新':'服务商已添加');
+      }catch(err){ alert(err.message||'保存失败'); }
+    });
+    async function toggleAccepting(id, val){
+      try{
+        const res=await fetch('/api/admin/services/'+id+'/accepting',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({accepting:val})});
+        if(!res.ok){const d=await res.json().catch(()=>({}));throw new Error(d.detail||'失败')}
+        loadServices();
+      }catch(e){alert(e.message||'切换失败')}
+    }
+    async function deleteService(id){if(!confirm('确定删除？'))return;await fetch('/api/admin/services/'+id,{method:'DELETE'});loadServices()}
+    let currentMsgPhone='';
+    async function loadMsgThreads(){
+      document.getElementById('msg-chat').classList.add('hidden');
+      document.getElementById('msg-threads').classList.remove('hidden');
+      const list=await (await fetch('/api/admin/messages')).json();
+      const box=document.getElementById('msg-threads');
+      if(!list.length){box.innerHTML='<p class="text-center text-gray-400 py-8 text-sm">暂无消息</p>';return}
+      box.innerHTML=list.map(m=>`<div class="bg-white rounded-2xl p-3 shadow-sm mb-2 active:bg-gray-50" onclick="openMsgChat('${m.user_phone}')">
+        <div class="flex justify-between"><span class="font-medium text-sm">${m.user_phone}</span><span class="text-xs text-gray-400">${m.count}条</span></div>
+        ${m.service_name?`<p class="text-xs text-rose-700 mt-0.5">服务: ${m.service_name}</p>`:''}
+        <p class="text-xs text-gray-500 mt-1 truncate">${m.last_role==='admin'?'客服: ':'用户: '}${m.last_content||''}</p>
+      </div>`).join('');
+    }
+    async function openMsgChat(phone){
+      currentMsgPhone=phone;
+      document.getElementById('msg-threads').classList.add('hidden');
+      document.getElementById('msg-chat').classList.remove('hidden');
+      document.getElementById('msg-phone-title').textContent='与 '+phone;
+      const list=await (await fetch('/api/messages/'+encodeURIComponent(phone))).json();
+      const box=document.getElementById('msg-list');
+      box.innerHTML=list.map(m=>`<div class="flex ${m.role==='admin'?'justify-end':''}">
+        <div class="max-w-[80%] rounded-xl px-3 py-2 ${m.role==='admin'?'bg-green-100 text-green-900':'bg-gray-100 text-gray-800'}">${m.content}
+        <div class="text-[10px] text-gray-400 mt-1">${m.created_at||''}</div></div>
+      </div>`).join('') || '<p class="text-gray-400 text-center">暂无消息</p>';
+      box.scrollTop=box.scrollHeight;
+    }
+    function closeMsgChat(){document.getElementById('msg-chat').classList.add('hidden');document.getElementById('msg-threads').classList.remove('hidden');loadMsgThreads()}
+    async function sendAdminMsg(){
+      const content=document.getElementById('msg-reply').value.trim();
+      if(!content||!currentMsgPhone) return;
+      await fetch('/api/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_phone:currentMsgPhone,content,role:'admin'})});
+      document.getElementById('msg-reply').value='';
+      openMsgChat(currentMsgPhone);
+    }
+    async function testTelegram(){
+      try{
+        // save first
+        await saveSettings();
+        const res=await fetch('/api/admin/telegram-test',{method:'POST'});
+        const d=await res.json().catch(()=>({}));
+        if(!res.ok) throw new Error(d.detail||'失败');
+        alert('测试消息已发送，请查看 Telegram');
+      }catch(e){alert(e.message||'测试失败')}
+    }
+    async function loadSettings(){
+      const s=await (await fetch('/api/admin/settings')).json();
+      document.getElementById('set-name').value=s.store_name||'';
+      document.getElementById('set-address').value=s.store_address||'';
+      document.getElementById('set-lat').value=s.store_lat||'3.118743';
+      document.getElementById('set-lng').value=s.store_lng||'101.727844';
+      document.getElementById('set-base').value=s.taxi_base_fee||'10';
+      document.getElementById('set-perkm').value=s.taxi_per_km||'2';
+      document.getElementById('set-note').value=s.payment_note||'见面收取费用，支持 USD / 支付宝 / 微信';
+      if(document.getElementById('set-wa')) document.getElementById('set-wa').value=s.whatsapp_notify||'';
+      if(document.getElementById('set-wa-key')) document.getElementById('set-wa-key').value=s.callmebot_apikey||'';
+      if(document.getElementById('set-gmaps')) document.getElementById('set-gmaps').value=s.google_maps_key||'';
+      if(document.getElementById('set-tg-token')) document.getElementById('set-tg-token').value=s.telegram_bot_token||'';
+      if(document.getElementById('set-tg-chat')) document.getElementById('set-tg-chat').value=s.telegram_chat_id||'';
+      document.getElementById('set-booking').value=s.booking_open||'1';
+    }
+    async function saveSettings(){
+      const body={store_name:document.getElementById('set-name').value,store_address:document.getElementById('set-address').value,store_lat:document.getElementById('set-lat').value,store_lng:document.getElementById('set-lng').value,taxi_base_fee:document.getElementById('set-base').value,taxi_per_km:document.getElementById('set-perkm').value,payment_note:document.getElementById('set-note').value,
+        booking_open:document.getElementById('set-booking')?document.getElementById('set-booking').value:'1',
+        whatsapp_notify:document.getElementById('set-wa')?document.getElementById('set-wa').value:'',
+        callmebot_apikey:document.getElementById('set-wa-key')?document.getElementById('set-wa-key').value:'',
+        google_maps_key:document.getElementById('set-gmaps')?document.getElementById('set-gmaps').value:'',
+        telegram_bot_token:document.getElementById('set-tg-token')?document.getElementById('set-tg-token').value:'',
+        telegram_chat_id:document.getElementById('set-tg-chat')?document.getElementById('set-tg-chat').value:''  };
+      await fetch('/api/admin/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const msg=document.getElementById('set-msg');msg.className='text-center text-sm text-green-600';msg.textContent='✅ 已保存';msg.classList.remove('hidden');
+    }
+    loadDash();
+  </script>
+</body>
+</html>
